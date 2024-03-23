@@ -1,8 +1,11 @@
+mod player;
+
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     prelude::*,
 };
 use bevy_rapier3d::prelude::*;
+use player::Player;
 
 fn main() {
     App::new()
@@ -10,7 +13,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, setup)
-        .add_systems(Update, print_mouse_events_system)
+        .add_systems(Update, (handle_player_input, move_player).chain())
         .run();
 }
 
@@ -19,16 +22,20 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    // Floor
     commands.spawn(PbrBundle {
         mesh: meshes.add(Circle::new(20.0)),
         material: materials.add(Color::WHITE),
         transform: Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         ..default()
     });
+
+    // Floor collider
     commands
         .spawn(Collider::cuboid(10.0, 1.0, 10.0))
         .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.5, 0.0)));
 
+    // Light
     commands.spawn(PointLightBundle {
         point_light: PointLight {
             shadows_enabled: false,
@@ -39,17 +46,44 @@ fn setup(
         ..default()
     });
 
+    // Camera
     commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(7.5, 15.0, 7.5).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
+
+    // Player
+    commands.spawn((
+        Player {
+            target: Vec3 {
+                y: 0.25,
+                ..default()
+            },
+        },
+        PbrBundle {
+            mesh: meshes.add(Sphere::new(0.5)),
+            material: materials.add(Color::BLUE),
+            transform: Transform::from_xyz(0.0, 0.25, 0.0),
+            ..default()
+        },
+    ));
 }
 
-fn print_mouse_events_system(
-    mut commands: Commands,
+fn move_player(time: Res<Time>, mut query: Query<(&Player, &mut Transform)>) {
+    let (player, mut transform) = query.single_mut();
+    let direction = player.target - transform.translation;
+
+    if direction.length() < 0.05 {
+        return;
+    }
+
+    let direction = direction.normalize();
+    transform.translation += direction * 5.0 * time.delta_seconds();
+}
+
+fn handle_player_input(
+    mut query: Query<&mut Player>,
     mut mouse_button_input_events: EventReader<MouseButtonInput>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform)>,
     rapier: Res<RapierContext>,
@@ -77,12 +111,8 @@ fn print_mouse_events_system(
                 let hit_point = camera_transform.translation() + ray_direction * toi;
                 println!("Hit entity {:?} at {:?}", entity, hit_point);
 
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Cuboid::new(0.1, 0.1, 0.1)),
-                    material: materials.add(Color::BLUE),
-                    transform: Transform::from_translation(hit_point),
-                    ..default()
-                });
+                let mut player = query.single_mut();
+                player.target = hit_point;
             }
         }
     }
