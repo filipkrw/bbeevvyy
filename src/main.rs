@@ -23,17 +23,24 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Floor
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Circle::new(20.0)),
-        material: materials.add(Color::WHITE),
-        transform: Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        ..default()
-    });
+    commands
+        .spawn(PbrBundle {
+            mesh: meshes.add(Cuboid::new(20.0, 0.5, 20.0)),
+            material: materials.add(Color::WHITE),
+            transform: Transform::default(),
+            ..default()
+        })
+        .insert(RigidBody::Fixed)
+        .insert(Collider::cuboid(10.0, 0.25, 10.0))
+        .insert(Damping {
+            linear_damping: 1.0,
+            angular_damping: 1.0,
+        });
 
     // Floor collider
-    commands
-        .spawn(Collider::cuboid(10.0, 1.0, 10.0))
-        .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.5, 0.0)));
+    // commands
+    //     .spawn(Collider::cuboid(10.0, 1.0, 10.0))
+    //     .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.5, 0.0)));
 
     // Light
     commands.spawn(PointLightBundle {
@@ -53,32 +60,21 @@ fn setup(
     });
 
     // Player
-    commands.spawn((
-        Player {
-            target: Vec3 {
-                y: 0.25,
-                ..default()
-            },
-        },
-        PbrBundle {
-            mesh: meshes.add(Sphere::new(0.5)),
-            material: materials.add(Color::BLUE),
-            transform: Transform::from_xyz(0.0, 0.25, 0.0),
-            ..default()
-        },
-    ));
+    Player::spawn(commands, meshes, materials);
 }
 
-fn move_player(time: Res<Time>, mut query: Query<(&Player, &mut Transform)>) {
-    let (player, mut transform) = query.single_mut();
+fn move_player(time: Res<Time>, mut query: Query<(&Player, &mut Transform, &mut ExternalForce)>) {
+    let (player, mut transform, mut ext_force) = query.single_mut();
     let direction = player.target - transform.translation;
 
     if direction.length() < 0.05 {
+        ext_force.force = Vec3::ZERO;
         return;
     }
 
     let direction = direction.normalize();
-    transform.translation += direction * 5.0 * time.delta_seconds();
+    // transform.translation += direction * 5.0 * time.delta_seconds();
+    ext_force.force = direction * time.delta_seconds() * 2000.0;
 }
 
 fn handle_player_input(
