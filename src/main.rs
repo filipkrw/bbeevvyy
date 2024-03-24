@@ -1,5 +1,7 @@
+mod behaviors;
 mod player;
 
+use behaviors::{arrive::Arrive, behavior::SteeringBehavior};
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     prelude::*,
@@ -37,11 +39,6 @@ fn setup(
             angular_damping: 1.0,
         });
 
-    // Floor collider
-    // commands
-    //     .spawn(Collider::cuboid(10.0, 1.0, 10.0))
-    //     .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.5, 0.0)));
-
     // Light
     commands.spawn(PointLightBundle {
         point_light: PointLight {
@@ -63,18 +60,28 @@ fn setup(
     Player::spawn(commands, meshes, materials);
 }
 
-fn move_player(time: Res<Time>, mut query: Query<(&Player, &mut Transform, &mut ExternalForce)>) {
-    let (player, mut transform, mut ext_force) = query.single_mut();
+fn move_player(
+    time: Res<Time>,
+    mut query: Query<(&Player, &mut Transform, &Velocity, &mut ExternalForce)>,
+) {
+    let (player, transform, velocity, mut ext_force) = query.single_mut();
     let direction = player.target - transform.translation;
 
-    if direction.length() < 0.05 {
+    if direction.length() < 0.01 {
         ext_force.force = Vec3::ZERO;
         return;
     }
 
-    let direction = direction.normalize();
-    // transform.translation += direction * 5.0 * time.delta_seconds();
-    ext_force.force = direction * time.delta_seconds() * 2000.0;
+    let steering = Arrive {
+        current_pos: transform.translation,
+        current_velocity: velocity.linvel,
+        target_pos: player.target,
+        ..default()
+    };
+
+    let steering = steering.get_steering_force();
+
+    ext_force.force = steering * time.delta_seconds();
 }
 
 fn handle_player_input(

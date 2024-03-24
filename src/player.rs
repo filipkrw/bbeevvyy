@@ -19,14 +19,14 @@ impl Player {
         commands
             .spawn(Player { target: position })
             .insert(PbrBundle {
-                mesh: meshes.add(Sphere::new(0.5)),
+                mesh: meshes.add(Sphere::new(0.25)),
                 material: materials.add(Color::BLUE),
                 transform: Transform::from_translation(position),
                 ..default()
             })
             .insert(RigidBody::Dynamic)
-            .insert(Collider::ball(0.5))
-            .insert(ColliderMassProperties::Density(3.0))
+            .insert(Collider::ball(0.25))
+            .insert(ColliderMassProperties::Density(1.0))
             .insert(Damping {
                 // linear_damping: 0.8,
                 ..default() // angular_damping: 0.8,
