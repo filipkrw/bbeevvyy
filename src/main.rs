@@ -1,21 +1,29 @@
 mod behaviors;
+mod enemy;
 mod player;
 
-use behaviors::{arrive::Arrive, behavior::SteeringBehavior};
+use behaviors::{
+    arrive::Arrive, behavior::SteeringBehavior, collision_avoidance::CollisionAvoidance,
+};
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
     prelude::*,
 };
 use bevy_rapier3d::prelude::*;
+use enemy::Enemy;
 use player::Player;
+use rand::Rng;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugins(RapierDebugRenderPlugin::default())
-        .add_systems(Startup, setup)
-        .add_systems(Update, (handle_player_input, move_player).chain())
+        // .add_plugins(RapierDebugRenderPlugin::default())
+        .add_systems(Startup, (setup, setup_enemies).chain())
+        .add_systems(
+            Update,
+            (handle_player_input, move_player, move_enemies).chain(),
+        )
         .run();
 }
 
@@ -58,6 +66,58 @@ fn setup(
 
     // Player
     Player::spawn(commands, meshes, materials);
+}
+
+fn setup_enemies(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mut rng = rand::thread_rng(); // Get a random number generator
+    let positions = (0..1)
+        .map(|_| {
+            Vec3::new(
+                rng.gen_range(-10.0..10.0), // Random x within a range, adjust as needed
+                0.25,                       // y is always 0.25
+                rng.gen_range(-10.0..10.0), // Random z within a range, adjust as needed
+            )
+        })
+        .collect::<Vec<_>>();
+    for position in positions {
+        Enemy::spawn(&mut commands, &mut meshes, &mut materials, position)
+    }
+}
+
+fn move_enemies(
+    time: Res<Time>,
+    q_player: Query<(&Player, &Transform, &Velocity)>,
+    mut q_enemies: Query<(&Enemy, &Transform, &Velocity, &mut ExternalForce)>,
+) {
+    let (_, p_transform, p_velocity) = q_player.single();
+
+    let mut len = 0;
+
+    for enemy in q_enemies.iter_mut() {
+        len += 1;
+        let (_, transform, velocity, mut ext_force) = enemy;
+
+        let steering = CollisionAvoidance {
+            current: (&transform, velocity),
+            max_acceleration: 10000.0,
+            radius: 20.5,
+            targets: vec![(&p_transform, p_velocity)],
+        };
+        let force = steering.get_steering_force();
+
+        if force.length() > 0.1 {
+            info!("{}", force.length());
+        }
+
+        ext_force.force = force * time.delta_seconds();
+        // ext_force.force = Vec3::new(0.1, 0.0, 0.0);
+    }
+
+    // info!("{}", len);
 }
 
 fn move_player(

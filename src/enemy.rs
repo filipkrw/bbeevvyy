@@ -2,25 +2,20 @@ use bevy::{math::Vec3, prelude::*};
 use bevy_rapier3d::prelude::*;
 
 #[derive(Component)]
-pub struct Player {
-    pub target: Vec3,
-}
+pub struct Enemy;
 
-impl Player {
+impl Enemy {
     pub fn spawn(
-        mut commands: Commands,
-        mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
+        commands: &mut Commands,
+        meshes: &mut ResMut<Assets<Mesh>>,
+        materials: &mut ResMut<Assets<StandardMaterial>>,
+        position: Vec3,
     ) {
-        let position = Vec3 {
-            y: 0.75,
-            ..default()
-        };
         commands
-            .spawn(Player { target: position })
+            .spawn(Enemy)
             .insert(PbrBundle {
                 mesh: meshes.add(Sphere::new(0.25)),
-                material: materials.add(Color::BLUE),
+                material: materials.add(Color::RED),
                 transform: Transform::from_translation(position),
                 ..default()
             })
@@ -32,13 +27,5 @@ impl Player {
             .insert(Sleeping::disabled())
             .insert(Ccd::enabled())
             .insert(ExternalForce::default());
-    }
-}
-
-impl Default for Player {
-    fn default() -> Self {
-        Self {
-            target: Default::default(),
-        }
     }
 }
