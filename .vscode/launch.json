@@ -16,7 +16,11 @@
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "env": {
+        // rustc --print target-libdir
+        "DYLD_LIBRARY_PATH": "${userHome}/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/lib"
+      }
     },
     {
       "type": "lldb",
@@ -30,7 +34,11 @@
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "env": {
+        // rustc --print target-libdir
+        "DYLD_LIBRARY_PATH": "${userHome}/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/lib"
+      }
     }
   ]
 }

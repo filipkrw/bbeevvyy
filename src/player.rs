@@ -19,7 +19,7 @@ impl Player {
         commands
             .spawn(Player { target: position })
             .insert(PbrBundle {
-                mesh: meshes.add(Cuboid::new(0.5, 0.5, 0.5)),
+                mesh: meshes.add(Sphere::new(0.5)),
                 material: materials.add(Color::BLUE),
                 transform: Transform::from_translation(position),
                 ..default()
