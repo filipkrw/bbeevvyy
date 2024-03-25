@@ -20,10 +20,8 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         // .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, (setup, setup_enemies).chain())
-        .add_systems(
-            Update,
-            (handle_player_input, move_player, move_enemies).chain(),
-        )
+        .add_systems(Update, handle_player_input)
+        .add_systems(FixedUpdate, (move_player, move_enemies).chain())
         .run();
 }
 
@@ -46,6 +44,48 @@ fn setup(
             linear_damping: 1.0,
             angular_damping: 1.0,
         });
+
+    // Walls
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Cuboid::new(0.5, 6.0, 20.0)),
+            material: materials.add(Color::WHITE),
+            transform: Transform::from_xyz(10.0, 0.25, 0.0),
+            ..default()
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(0.25, 10.0, 10.0),
+    ));
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Cuboid::new(0.5, 6.0, 20.0)),
+            material: materials.add(Color::WHITE),
+            transform: Transform::from_xyz(-10.0, 0.25, 0.0),
+            ..default()
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(0.25, 10.0, 10.0),
+    ));
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Cuboid::new(20.0, 6.0, 0.5)),
+            material: materials.add(Color::WHITE),
+            transform: Transform::from_xyz(0.0, 0.25, 10.0),
+            ..default()
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(10.0, 10.0, 0.25),
+    ));
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Cuboid::new(20.0, 6.0, 0.5)),
+            material: materials.add(Color::WHITE),
+            transform: Transform::from_xyz(0.0, 0.25, -10.0),
+            ..default()
+        },
+        RigidBody::Fixed,
+        Collider::cuboid(10.0, 10.0, 0.25),
+    ));
 
     // Light
     commands.spawn(PointLightBundle {
@@ -74,7 +114,7 @@ fn setup_enemies(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mut rng = rand::thread_rng(); // Get a random number generator
-    let positions = (0..1)
+    let positions = (0..5000)
         .map(|_| {
             Vec3::new(
                 rng.gen_range(-10.0..10.0), // Random x within a range, adjust as needed
@@ -95,29 +135,25 @@ fn move_enemies(
 ) {
     let (_, p_transform, p_velocity) = q_player.single();
 
-    let mut len = 0;
-
     for enemy in q_enemies.iter_mut() {
-        len += 1;
         let (_, transform, velocity, mut ext_force) = enemy;
 
         let steering = CollisionAvoidance {
-            current: (&transform, velocity),
+            current: behaviors::collision_avoidance::Entity {
+                position: transform.translation,
+                velocity: velocity.linvel,
+            },
             max_acceleration: 10000.0,
-            radius: 20.5,
-            targets: vec![(&p_transform, p_velocity)],
+            radius: 3.5,
+            targets: vec![behaviors::collision_avoidance::Entity {
+                position: p_transform.translation,
+                velocity: p_velocity.linvel,
+            }],
         };
         let force = steering.get_steering_force();
 
-        if force.length() > 0.1 {
-            info!("{}", force.length());
-        }
-
         ext_force.force = force * time.delta_seconds();
-        // ext_force.force = Vec3::new(0.1, 0.0, 0.0);
     }
-
-    // info!("{}", len);
 }
 
 fn move_player(
@@ -140,7 +176,6 @@ fn move_player(
     };
 
     let steering = steering.get_steering_force();
-
     ext_force.force = steering * time.delta_seconds();
 }
 

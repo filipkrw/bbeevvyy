@@ -42,7 +42,7 @@ impl Default for Arrive {
             current_velocity: Vec3::ZERO,
             target_pos: Vec3::ZERO,
             slow_radius: 1.5,
-            max_speed: 5.0,
+            max_speed: 7.5,
             time_to_target: 0.001,
             max_acceleration: 250.0,
             max_deceleration: 500.0,
