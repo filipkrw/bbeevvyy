@@ -3,7 +3,9 @@ mod enemy;
 mod player;
 
 use behaviors::{
-    arrive::Arrive, behavior::SteeringBehavior, collision_avoidance::CollisionAvoidance,
+    arrive::Arrive,
+    behavior::SteeringBehavior,
+    collision_avoidance::{CollisionAvoidance, Entity},
 };
 use bevy::{
     input::{mouse::MouseButtonInput, ButtonState},
@@ -114,7 +116,7 @@ fn setup_enemies(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mut rng = rand::thread_rng(); // Get a random number generator
-    let positions = (0..5000)
+    let positions = (0..200)
         .map(|_| {
             Vec3::new(
                 rng.gen_range(-10.0..10.0), // Random x within a range, adjust as needed
@@ -135,20 +137,38 @@ fn move_enemies(
 ) {
     let (_, p_transform, p_velocity) = q_player.single();
 
-    for enemy in q_enemies.iter_mut() {
+    let enemy_entities: Vec<_> = q_enemies
+        .into_iter()
+        .map(|(_, e_transform, e_velocity, _)| Entity {
+            position: e_transform.translation,
+            velocity: e_velocity.linvel,
+        })
+        .enumerate()
+        .collect();
+
+    for (outer_index, enemy) in q_enemies.iter_mut().enumerate() {
         let (_, transform, velocity, mut ext_force) = enemy;
 
+        let mut targets: Vec<Entity> = enemy_entities
+            .clone()
+            .into_iter()
+            .filter(|(inner_index, _)| *inner_index != outer_index)
+            .map(|(_, enemy)| enemy)
+            .collect();
+
+        targets.push(Entity {
+            position: p_transform.translation,
+            velocity: p_velocity.linvel,
+        });
+
         let steering = CollisionAvoidance {
-            current: behaviors::collision_avoidance::Entity {
+            current: Entity {
                 position: transform.translation,
                 velocity: velocity.linvel,
             },
-            max_acceleration: 10000.0,
-            radius: 3.5,
-            targets: vec![behaviors::collision_avoidance::Entity {
-                position: p_transform.translation,
-                velocity: p_velocity.linvel,
-            }],
+            max_acceleration: 3000.0,
+            radius: 0.5,
+            targets,
         };
         let force = steering.get_steering_force();
 
@@ -158,25 +178,52 @@ fn move_enemies(
 
 fn move_player(
     time: Res<Time>,
-    mut query: Query<(&Player, &mut Transform, &Velocity, &mut ExternalForce)>,
+    mut set: ParamSet<(
+        Query<(&Player, &mut Transform, &Velocity, &mut ExternalForce)>,
+        Query<(&Enemy, &Transform, &Velocity)>,
+    )>,
 ) {
-    let (player, transform, velocity, mut ext_force) = query.single_mut();
-    let direction = player.target - transform.translation;
+    let enemies: Vec<_> = set
+        .p1()
+        .into_iter()
+        .map(|(_, e_transform, e_velocity)| Entity {
+            position: e_transform.translation,
+            velocity: e_velocity.linvel,
+        })
+        .collect();
 
-    if direction.length() < 0.01 {
-        ext_force.force = Vec3::ZERO;
-        return;
-    }
+    let mut q_player = set.p0();
 
-    let steering = Arrive {
-        current_pos: transform.translation,
-        current_velocity: velocity.linvel,
+    let (player, p_transform, p_velocity, mut p_ext_force) = q_player.single_mut();
+
+    let collision_avoidance = CollisionAvoidance {
+        current: Entity {
+            position: p_transform.translation,
+            velocity: p_velocity.linvel,
+        },
+        max_acceleration: 3000.0,
+        radius: 0.5,
+        targets: enemies,
+    };
+
+    let arrive = Arrive {
+        current_pos: p_transform.translation,
+        current_velocity: p_velocity.linvel,
         target_pos: player.target,
         ..default()
     };
 
-    let steering = steering.get_steering_force();
-    ext_force.force = steering * time.delta_seconds();
+    let arrive_force = arrive.get_steering_force();
+    let collision_avoidance_force = collision_avoidance.get_steering_force();
+
+    let direction = player.target - p_transform.translation;
+    if direction.length() < 0.01 {
+        p_ext_force.force = Vec3::ZERO;
+        return;
+    }
+
+    let force = arrive_force * 0.3 + collision_avoidance_force * 0.7;
+    p_ext_force.force = force * time.delta_seconds();
 }
 
 fn handle_player_input(

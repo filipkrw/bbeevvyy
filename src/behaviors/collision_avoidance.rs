@@ -4,6 +4,7 @@ use bevy::math::Vec3;
 
 use super::behavior::SteeringBehavior;
 
+#[derive(Clone)]
 pub struct Entity {
     pub position: Vec3,
     pub velocity: Vec3,
@@ -18,7 +19,7 @@ pub struct CollisionAvoidance {
 
 impl SteeringBehavior for CollisionAvoidance {
     fn get_steering_force(&self) -> Vec3 {
-        let time_horizon: f32 = 0.1;
+        let time_horizon: f32 = 0.05;
 
         let mut total_force = Vec3::ZERO;
 
